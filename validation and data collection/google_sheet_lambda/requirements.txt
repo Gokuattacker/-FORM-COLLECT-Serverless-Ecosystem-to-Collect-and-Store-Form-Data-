@@ -1,0 +1,4 @@
+requests
+boto3
+gspread
+oauth2client
