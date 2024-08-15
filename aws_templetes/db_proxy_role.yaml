@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Cloudformation template for db proxy role and permissions
+
+Resources:
+  LambdaS3BucketPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "s3:*"
+            Resource:
+              - "*"
+        
+      PolicyName: lambdaS3BucketPolicy
+      Roles: 
+        - !Ref DbProxyIAMRole
+
+  DbProxyIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: dbProxyIAMRole
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+
+Outputs:
+  DbProxyIAMRole:
+    Description: IAM role for db proxy lambda
+    Value: !GetAtt DbProxyIAMRole.Arn
+    Export:
+      Name: !Sub "dbLambdaRoleArn" 
+  LambdaS3BucketPolicy:
+    Description: Custom policy for the s3 bucket lambdas
+    Value: !Ref LambdaS3BucketPolicy
+    Export:
+      Name: !Sub "lambdaS3BucketPolicy"

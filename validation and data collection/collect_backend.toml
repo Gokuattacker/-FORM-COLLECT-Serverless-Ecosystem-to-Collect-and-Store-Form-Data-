@@ -1,0 +1,9 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "<Insert name of the stack>"
+s3_bucket = "<Insert S3 bucket name where the config files from SAM would be kept for the atlan backend lambdas>"
+capabilities = "CAPABILITY_NAMED_IAM"
+image_repository = "<Insert the ECR Repository link for Atlan Collect Backend>"
+parameter_overrides = "dbProxy=\"<Insert the Arn for Db Proxy Lambda>\" csvS3Bucket=\"<Insert the bucket name of the csv S3 bucket>\" googleCredentialsS3Bucket=\"<Insert the bucket name for the Google Credentials S3 Bucket>\" googleCredentialsObjectKey=\"<Insert the name of the object key from where the credentials should be taken>\""

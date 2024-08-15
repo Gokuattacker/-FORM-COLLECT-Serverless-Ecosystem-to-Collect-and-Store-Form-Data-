@@ -1,0 +1,353 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Template for the All the Atlan Collect Lambdas
+
+Parameters:
+  GoogleSheetApiGatewayStageName:
+    Default: gs-v1
+    Description: Stage Name for Google Sheet Api Gateway
+    Type: String
+  DataCollectorApiGatewayStageName:
+    Default: collect-v1
+    Description: Stage Name for Data Collector Api Gateway
+    Type: String
+  roleStackName:
+    Default: atlan-collect-IAM
+    Type: String
+    NoEcho: true
+  dbProxy:
+    Type: String
+    NoEcho: true
+  regionName:
+    Type: String
+    Default: ap-south-1
+    NoEcho: true
+  csvS3Bucket:
+    Type: String
+    NoEcho: true
+  googleCredentialsS3Bucket:
+    Type: String
+    NoEcho: true
+  googleCredentialsObjectKey:
+    Type: String
+    NoEcho: true
+
+Resources:
+  CollectApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      ApiKeySourceType: HEADER
+      Description: An API Gateway with a Lambda Integration
+      Name: get-collect-api
+  
+  DataCollectorApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt CollectApi.RootResourceId
+      PathPart: 'collect'
+      RestApiId: !Ref CollectApi
+  
+  GoogleSheetApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt CollectApi.RootResourceId
+      PathPart: 'google-sheet'
+      RestApiId: !Ref CollectApi
+  
+  DataCollectorApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        Credentials: !GetAtt DataCollectorApiGatewayIamRole.Arn
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: {"application/json": ""}
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with,x-amzn-errortype'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: "200"
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: "{\"body\":$input.body}"
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt "CollectionValidationFunction.Arn"
+      MethodResponses: 
+        - ResponseModels: 
+            application/json : 'Empty'
+          ResponseParameters: 
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: "200"  
+      OperationName: 'Collect Validation operation'
+      ResourceId: !Ref DataCollectorApiGatewayResource
+      RestApiId: !Ref CollectApi
+  
+  GoogleSheetApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: true
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        Credentials: !GetAtt GoogleSheetApiGatewayIamRole.Arn
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseTemplates: {"application/json": ""}
+            ResponseParameters:
+              method.response.header.X-Requested-With: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-requested-with,x-amzn-errortype'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: "200"
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        RequestTemplates:
+          application/json: "{\"body\":$input.body}"
+        TimeoutInMillis: 29000
+        Type: AWS
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations'
+          - lambdaArn: !GetAtt "GoogleSheetFunction.Arn"
+      MethodResponses: 
+        - ResponseModels: 
+            application/json : 'Empty'
+          ResponseParameters: 
+            method.response.header.X-Requested-With: false
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: "200"  
+      OperationName: 'Collect Validation operation'
+      ResourceId: !Ref GoogleSheetApiGatewayResource
+      RestApiId: !Ref CollectApi
+
+  ApiGatewayModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref CollectApi
+      Schema: {}
+
+  DataCollectorApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: DataCollectorApiGatewayMethod
+    Properties:
+      Description: Data Collector Lambda API Deployment
+      RestApiId: !Ref CollectApi
+  
+  GoogleSheetApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: GoogleSheetApiGatewayMethod
+    Properties:
+      Description: Google Sheet Lambda API Deployment
+      RestApiId: !Ref CollectApi
+
+  DataCollectorApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref DataCollectorApiGatewayDeployment
+      Description: Lambda API Stage
+      RestApiId: !Ref CollectApi
+      StageName: !Ref DataCollectorApiGatewayStageName
+  
+  GoogleSheetApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref GoogleSheetApiGatewayDeployment
+      RestApiId: !Ref CollectApi
+      StageName: !Ref GoogleSheetApiGatewayStageName
+
+  DataCollectorApiGatewayIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ''
+            Effect: 'Allow'
+            Principal:
+              Service:
+                - 'apigateway.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+  
+  GoogleSheetApiGatewayIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ''
+            Effect: 'Allow'
+            Principal:
+              Service:
+                - 'apigateway.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+
+  GoogleSheetApiGatewayPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: "LambdaAccess"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        -
+          Effect: 'Allow'
+          Action: 'lambda:*'
+          Resource: !GetAtt GoogleSheetFunction.Arn
+      Roles: 
+      - !Ref GoogleSheetApiGatewayIamRole
+ 
+  DataCollectorApiGatewayPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: "LambdaAccess"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        -
+          Effect: 'Allow'
+          Action: 'lambda:*'
+          Resource: !GetAtt CollectionValidationFunction.Arn
+      Roles: 
+      - !Ref DataCollectorApiGatewayIamRole
+  
+  ApiUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: 
+    - DataCollectorApiGatewayStage
+    - GoogleSheetApiGatewayStage
+    Properties:
+      ApiStages:
+        - ApiId: !Ref CollectApi
+          Stage: !Ref GoogleSheetApiGatewayStageName
+        - ApiId: !Ref CollectApi
+          Stage: !Ref DataCollectorApiGatewayStageName
+      Quota:
+        Limit: 1000
+        Period: MONTH
+      UsagePlanName: "collect-api-usage-plan"
+  
+  ApiGatewayKey:
+    Type:  AWS::ApiGateway::ApiKey
+    DependsOn: 
+    - DataCollectorApiGatewayDeployment
+    - GoogleSheetApiGatewayDeployment
+    - ApiUsagePlan
+    Properties:
+      Name: collectvalidationApiKey
+      Description: API Key for v1 stage of collect-validation lambda
+      Enabled: true
+      StageKeys:
+        - RestApiId: !Ref CollectApi
+          StageName: !Ref GoogleSheetApiGatewayStageName
+        - RestApiId: !Ref CollectApi
+          StageName: !Ref DataCollectorApiGatewayStageName
+  
+  ApiUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    DependsOn: 
+      - CollectApi
+    Properties:
+      KeyId: !Ref ApiGatewayKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref ApiUsagePlan
+
+  CollectionValidationFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      PackageType: Image
+      MemorySize: 256
+      Timeout: 90
+      Role: 
+        Fn::ImportValue: !Sub "${roleStackName}-collectValidationLambdaRoleArn"
+      Environment:
+        Variables:
+          SQS_QUEUE_NAME: !GetAtt CollectSQSQueue.QueueUrl
+          REGION_NAME: !Ref regionName
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./collect_validation
+      DockerTag: v1
+    
+  CollectSQSQueue:
+    Type: AWS::SQS::Queue
+    Properties: 
+      DelaySeconds: 10
+      VisibilityTimeout: 40
+      QueueName: "atlan-collect-sqs"
+  
+  DataCollectorFunction:
+    Type: AWS::Serverless::Function
+    Properties: 
+      PackageType: Image
+      MemorySize: 256
+      Timeout: 30
+      Role: 
+        Fn::ImportValue: !Sub "${roleStackName}-dataCollectorLambdaRoleArn"
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt CollectSQSQueue.Arn
+            BatchSize: 1
+      Environment:
+        Variables: 
+          DB_PROXY_ARN: !Ref dbProxy
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./data_collector
+      DockerTag: v1
+
+  GoogleSheetFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      MemorySize: 256
+      Timeout: 30
+      Role:
+        Fn::ImportValue: !Sub "${roleStackName}-googleSheetLambdaRoleArn"
+      Environment:
+        Variables: 
+          DB_PROXY_ARN: !Ref dbProxy
+          CSV_S3_BUCKET_NAME: !Ref csvS3Bucket
+          GOOGLE_CREDENTIALS_S3_BUCKET: !Ref googleCredentialsS3Bucket
+          GOOGLE_CREDENTIALS_OBJECT_KEY_NAME: !Ref googleCredentialsObjectKey
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./google_sheet_lambda
+      DockerTag: v1
+  
+
+Outputs:
+  DataCollectApi:
+    Description: "API Gateway endpoint URL for Prod stage for Collect Validation Function"
+    Value: !Sub "https://${CollectApi}.execute-api.${AWS::Region}.amazonaws.com/${DataCollectorApiGatewayStageName}/"
+  GSApi:
+    Description: "API Gateway endpoint URL for Prod stage for Google Sheet Function"
+    Value: !Sub "https://${CollectApi}.execute-api.${AWS::Region}.amazonaws.com/${GoogleSheetApiGatewayStageName}/"
+  CollectionValidationFunction:
+    Description: "Collect Validation Function ARN"
+    Value: !GetAtt CollectionValidationFunction.Arn
+  DataCollectorFunction:
+    Description: "Data Collector Function ARN"
+    Value: !GetAtt DataCollectorFunction.Arn
+  GoogleSheetFunction:
+    Description: "Google Sheet Function ARN"
+    Value: !GetAtt GoogleSheetFunction.Arn
+  ApiGatewayKey:
+    Description: "API Gateway Key for the collect validation method and the ApiGatewayStageName stage"
+    Value: !Ref ApiGatewayKey

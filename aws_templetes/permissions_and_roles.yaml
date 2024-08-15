@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Cloudformation template for data collector role and permissions
+
+Resources:
+  LambdaSQSCustomPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "sqs:SendMessage"
+              - "sqs:ReceiveMessage"
+              - "sqs:DeleteMessage"
+              - "sqs:GetQueueAttributes"
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource:
+              - "arn:aws:sqs:*"
+        
+      PolicyName: LambdaSQSCustomPolicy
+      Roles: 
+        - !Ref CollectValidationLambdaIAMRole
+        - !Ref DataCollectorLambdaIAMRole
+
+  DbProxyLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: lambdaInvokePolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "lambda:InvokeFunction"
+              - "lambda:InvokeAsync"
+            Resource:
+              - "<Insert the Arn of the db proxy lambda>"   
+      Roles:
+        - !Ref DataCollectorLambdaIAMRole 
+        - !Ref GoogleSheetLambdaIAMRole
+
+  
+  CollectValidationLambdaIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: collectValidationLambdaRole
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+  
+  DataCollectorLambdaIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: dataCollectorLambdaRole
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+  
+  GoogleSheetLambdaIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: googleSheetLambdaRole
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: s3LambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:*"
+                Resource:
+                  - "*"       
+
+Outputs:
+  CollectValidationLambdaRole:
+    Description: IAM role for collect validation lambda
+    Value: !GetAtt CollectValidationLambdaIAMRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-collectValidationLambdaRoleArn"
+  DataCollectorLambdaRole:
+    Description: IAM role for data collector lambda
+    Value: !GetAtt DataCollectorLambdaIAMRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-dataCollectorLambdaRoleArn"
+  GoogleSheetLambdaRole:
+    Description: IAM role for google sheet lambda
+    Value: !GetAtt GoogleSheetLambdaIAMRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-googleSheetLambdaRoleArn"

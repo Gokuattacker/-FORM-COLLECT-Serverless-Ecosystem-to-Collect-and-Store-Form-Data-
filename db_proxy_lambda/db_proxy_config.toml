@@ -1,0 +1,9 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "<Insert name of the db proxy stack>"
+s3_bucket = "<Insert name of the S3 bucket where the config files of the db proxy lambda is kept>"
+capabilities = "CAPABILITY_NAMED_IAM"
+image_repository = "<Insert the ECR repository link where the docker images of the db proxy lambda would be kept>"
+parameter_overrides = "rdsHost=\"<Insert the url for the RDS database>\" rdsUsername=\"<Insert the username for the RDS>\" rdsPassword=\"<Insert the password for the RDS>\" rdsDbName=\"<Insert the database name in the RDS>\" googleSheetS3Bucket=\"<Insert the name of the csv S3 bucket>\""

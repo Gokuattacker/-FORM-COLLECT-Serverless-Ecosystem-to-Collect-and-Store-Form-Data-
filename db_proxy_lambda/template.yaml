@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  python3.9
+
+  Template for the DB Proxy Lambda for RDS  
+
+
+Parameters:
+  rdsHost:
+    Type: String
+    NoEcho: true
+  rdsUsername:
+    Type: String
+    NoEcho: true
+  rdsPassword:
+    Type: String
+    NoEcho: true
+  rdsDbName:
+    Type: String
+    NoEcho: true
+  googleSheetS3Bucket:
+    Type: String
+    NoEcho: true
+
+Resources:
+  DBProxyLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      MemorySize: 256
+      Timeout: 90
+      Role:
+        Fn::ImportValue: !Sub "dbLambdaRoleArn"
+      Environment:
+        Variables:
+          RDS_HOST: !Ref rdsHost
+          RDS_USERNAME: !Ref rdsUsername
+          RDS_PASSWORD: !Ref rdsPassword
+          RDS_DB_NAME: !Ref rdsDbName
+          S3_BUCKET_NAME: !Ref googleSheetS3Bucket
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: ./db_proxy
+      DockerTag: v1
+ 
+Outputs:
+  DBProxyFunction:
+    Description: "Arn for DB Proxy Lambda Function"
+    Value: !GetAtt DBProxyLambdaFunction.Arn
+
+
+
+
